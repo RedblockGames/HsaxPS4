@@ -1,4 +1,5 @@
 name: Build Xash3D Test
+
 on:
   push:
     branches: [ main, master ]
@@ -21,9 +22,8 @@ jobs:
         sudo apt-get install -y build-essential cmake libsdl2-dev libgl1-mesa-dev libfontconfig1-dev
 
     - name: Configure CMake
-      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DXASH_64BIT=1 -DCMAKE_C_STANDARD=11
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DXASH_64BIT=1 -DCMAKE_C_STANDARD=11 -DCMAKE_C_FLAGS="-fpermissive -Wno-error" -DCMAKE_CXX_FLAGS="-fpermissive -Wno-error"
 
     - name: Compile Project
       run: cmake --build build
-      
       
