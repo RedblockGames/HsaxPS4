@@ -1,4 +1,4 @@
-name: Build Xash3D for PS4
+name: Build Xash3D Test
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build-ps4:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,30 +16,17 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Set up Docker / Toolchain for PS4
+    - name: Install dependencies
       run: |
-        echo "Настраиваем окружение для сборки под PS4..."
-        docker pull ghcr.io/open-ps4-sdk/open-ps4-sdk:latest || echo "Используем стандартный контейнер"
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev
 
-    - name: Configure CMake for PS4
+    - name: Configure CMake
       run: |
         mkdir build && cd build
-        cmake .. -DCMAKE_SYSTEM_NAME=Generic -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+        cmake ..
 
     - name: Compile Project
       run: |
-        cd build
-        cmake --build . --config Release
-
-    - name: Pack artifacts into PKG
-      run: |
-        echo "Упаковываем бинарники в .pkg для GoldHEN..."
-        mkdir -p output
-        echo "Xash3D PS4 Build Ready" > output/read_me.txt
-
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: xash3d-ps4-pkg
-        path: output/
+        cmake --build build --config Release
         
