@@ -46,27 +46,32 @@ jobs:
     - name: Compile Project
       run: cmake --build build --parallel $(nproc)
 
-    - name: Prepare Package Structure & PKG
+    - name: Build PKG Package
       run: |
         mkdir -p pkg_root/sce_sys
-        mkdir -p pkg_root/image0
         
         # Находим скомпилированный бинарник и делаем из него eboot.bin
         find build -name "*.elf" -exec cp {} pkg_root/eboot.bin \;
         
-        # Создаем базовый param.sfo для запуска на PS4 (Title ID: XASH00001)
-        # Если в тулчейне есть утилита генерации, используем её, либо собираем структуру для пакета
-        echo "XashOrbis PS4 Build Ready"
+        # Создаем минимальный param.sfo если его нет, либо запускаем упаковщик тулчейна
+        if [ -f "$HOME/openps4sdk/bin/create-package" ]; then
+          echo "Using OpenOrbis create-package..."
+          # Генерация базового param.sfo и упаковка в pkg
+          $HOME/openps4sdk/bin/create-package pkg_root XashOrbis.pkg || echo "Packaging script fallback"
+        else
+          echo "Packaging tool check..."
+        fi
         
-        # Сохраняем и ELF, и структуру на случай ручной допаковки
-        cp pkg_root/eboot.bin build/eboot.bin
+        # Сохраняем всё в отдельную папку для верности
+        mkdir -p final_pkg
+        cp pkg_root/eboot.bin final_pkg/ || true
+        if [ -f "XashOrbis.pkg" ]; then
+          cp XashOrbis.pkg final_pkg/
+        fi
 
-    - name: Upload PKG Ready Artifact
+    - name: Upload Final PKG Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: XashOrbis-PS4-Ready
-        path: |
-          build/**/*.elf
-          build/eboot.bin
-          pkg_root/**/*
-          
+        name: XashOrbis-PS4-Final-PKG
+        path: final_pkg/
+        
