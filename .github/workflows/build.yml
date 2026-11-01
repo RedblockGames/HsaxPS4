@@ -1,4 +1,4 @@
-name: Build XashOrbis PS4 PKG
+name: Build XashOrbis PS4
 
 on:
   push:
@@ -46,40 +46,15 @@ jobs:
     - name: Compile Project
       run: cmake --build build --parallel $(nproc)
 
-    - name: Create Package Structure and PKG
+    - name: Extract Binary (eboot.bin)
       run: |
-        mkdir -p pkg_root/sce_sys
-        
-        # Достаем скомпилированный бинарник как eboot.bin
-        find build -name "*.elf" -exec cp {} pkg_root/eboot.bin \;
-        
-        # Создаем минимальный param.sfo с помощью python-скрипта или тулчейна
-        # Прописываем Title ID: XASH00001
-        python3 -c "
-        import struct
-        sfo = bytearray(0x140)
-        sfo[0:4] = b'\x00PSF'
-        sfo[4:8] = b'\x01\x01\x00\x00'
-        # Записываем базовые параметры для param.sfo
-        with open('pkg_root/sce_sys/param.sfo', 'wb') as f:
-            f.write(b'\x00PSF\x01\x01\x00\x00\x00\x01\x00\x00\x00\x00\x01\x00\x00\x01\x00\x00\x4c\x00\x00\x00\xf8\x00\x00\x00\x38\x00\x00\x00title_id\x00\x00\x00\x02\x00\x00\x00\x0c\x00\x0c\x00\x00\x00\x00\x00XASH00001\x00\x00')
-        " || echo "Param creation fallback"
+        mkdir -p ps4_output
+        find build -name "*.elf" -exec cp {} ps4_output/eboot.bin \;
+        ls -la ps4_output
 
-        # Упаковываем через тулчейн OpenOrbis
-        mkdir -p final_pkg
-        if [ -f "$HOME/openps4sdk/bin/create-package" ]; then
-          echo "Running create-package..."
-          $HOME/openps4sdk/bin/create-package pkg_root final_pkg/XashOrbis.pkg || echo "Create-package failed"
-        else
-          echo "Tool not found, copying binary instead"
-          cp pkg_root/eboot.bin final_pkg/
-        fi
-        
-        ls -la final_pkg
-
-    - name: Upload PKG Artifact
+    - name: Upload Binary Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: XashOrbis-PS4-PKG
-        path: final_pkg/
+        name: XashOrbis-PS4-Binary
+        path: ps4_output/
         
