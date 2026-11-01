@@ -19,11 +19,10 @@ jobs:
     - name: Install Dependencies & Open PS4 SDK
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake libsdl2-dev libgl1-mesa-dev libfontconfig1-dev
+        sudo apt-get install -y build-essential cmake libsdl2-dev libgl1-mesa-dev libfontconfig1-dev clang lld
         
-        # Клонируем официальный Open PS4 SDK прямо в систему сборщика
         git clone https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain.git $HOME/openps4sdk
-        echo "PS4SDK=$HOME/openps4sdk" >> $GITHUB_ENV
+        echo "OO_PS4_TOOLCHAIN=$HOME/openps4sdk" >> $GITHUB_ENV
         echo "$HOME/openps4sdk/bin" >> $GITHUB_PATH
 
     - name: Fix rsqrt conflict in source code
@@ -37,9 +36,10 @@ jobs:
           -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
           -DXASH_64BIT=1 \
           -DCMAKE_C_STANDARD=11 \
+          -DCMAKE_C_COMPILER=orbis-clang \
+          -DCMAKE_CXX_COMPILER=orbis-clang++ \
           -DCMAKE_C_FLAGS="-w -D_GNU_SOURCE -Wno-error=incompatible-pointer-types -Wno-error=int-conversion" \
-          -DCMAKE_CXX_FLAGS="-w -D_GNU_SOURCE -Wno-error=incompatible-pointer-types -Wno-error=int-conversion" \
-          -DCMAKE_TOOLCHAIN_FILE=$PS4SDK/share/openps4sdk.cmake
+          -DCMAKE_CXX_FLAGS="-w -D_GNU_SOURCE -Wno-error=incompatible-pointer-types -Wno-error=int-conversion"
 
     - name: Compile Project
       run: cmake --build build --parallel $(nproc)
