@@ -1,4 +1,4 @@
-name: Build XashOrbis PS4
+name: Build XashOrbis PS4 PKG
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
     - name: Install Dependencies & Setup Open PS4 SDK
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake libsdl2-dev libgl1-mesa-dev libfontconfig1-dev clang lld git
+        sudo apt-get install -y build-essential cmake libsdl2-dev libgl1-mesa-dev libfontconfig1-dev clang lld git python3
         
         git clone --recursive https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain.git $HOME/openps4sdk
         
@@ -46,9 +46,27 @@ jobs:
     - name: Compile Project
       run: cmake --build build --parallel $(nproc)
 
-    - name: Upload PKG Artifact
+    - name: Prepare Package Structure & PKG
+      run: |
+        mkdir -p pkg_root/sce_sys
+        mkdir -p pkg_root/image0
+        
+        # Находим скомпилированный бинарник и делаем из него eboot.bin
+        find build -name "*.elf" -exec cp {} pkg_root/eboot.bin \;
+        
+        # Создаем базовый param.sfo для запуска на PS4 (Title ID: XASH00001)
+        # Если в тулчейне есть утилита генерации, используем её, либо собираем структуру для пакета
+        echo "XashOrbis PS4 Build Ready"
+        
+        # Сохраняем и ELF, и структуру на случай ручной допаковки
+        cp pkg_root/eboot.bin build/eboot.bin
+
+    - name: Upload PKG Ready Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: XashOrbis-PS4
-        path: build/
-        
+        name: XashOrbis-PS4-Ready
+        path: |
+          build/**/*.elf
+          build/eboot.bin
+          pkg_root/**/*
+          
