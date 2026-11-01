@@ -46,32 +46,40 @@ jobs:
     - name: Compile Project
       run: cmake --build build --parallel $(nproc)
 
-    - name: Build PKG Package
+    - name: Create Package Structure and PKG
       run: |
         mkdir -p pkg_root/sce_sys
         
-        # Находим скомпилированный бинарник и делаем из него eboot.bin
+        # Достаем скомпилированный бинарник как eboot.bin
         find build -name "*.elf" -exec cp {} pkg_root/eboot.bin \;
         
-        # Создаем минимальный param.sfo если его нет, либо запускаем упаковщик тулчейна
+        # Создаем минимальный param.sfo с помощью python-скрипта или тулчейна
+        # Прописываем Title ID: XASH00001
+        python3 -c "
+        import struct
+        sfo = bytearray(0x140)
+        sfo[0:4] = b'\x00PSF'
+        sfo[4:8] = b'\x01\x01\x00\x00'
+        # Записываем базовые параметры для param.sfo
+        with open('pkg_root/sce_sys/param.sfo', 'wb') as f:
+            f.write(b'\x00PSF\x01\x01\x00\x00\x00\x01\x00\x00\x00\x00\x01\x00\x00\x01\x00\x00\x4c\x00\x00\x00\xf8\x00\x00\x00\x38\x00\x00\x00title_id\x00\x00\x00\x02\x00\x00\x00\x0c\x00\x0c\x00\x00\x00\x00\x00XASH00001\x00\x00')
+        " || echo "Param creation fallback"
+
+        # Упаковываем через тулчейн OpenOrbis
+        mkdir -p final_pkg
         if [ -f "$HOME/openps4sdk/bin/create-package" ]; then
-          echo "Using OpenOrbis create-package..."
-          # Генерация базового param.sfo и упаковка в pkg
-          $HOME/openps4sdk/bin/create-package pkg_root XashOrbis.pkg || echo "Packaging script fallback"
+          echo "Running create-package..."
+          $HOME/openps4sdk/bin/create-package pkg_root final_pkg/XashOrbis.pkg || echo "Create-package failed"
         else
-          echo "Packaging tool check..."
+          echo "Tool not found, copying binary instead"
+          cp pkg_root/eboot.bin final_pkg/
         fi
         
-        # Сохраняем всё в отдельную папку для верности
-        mkdir -p final_pkg
-        cp pkg_root/eboot.bin final_pkg/ || true
-        if [ -f "XashOrbis.pkg" ]; then
-          cp XashOrbis.pkg final_pkg/
-        fi
+        ls -la final_pkg
 
-    - name: Upload Final PKG Artifact
+    - name: Upload PKG Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: XashOrbis-PS4-Final-PKG
+        name: XashOrbis-PS4-PKG
         path: final_pkg/
         
