@@ -1,4 +1,4 @@
-name: Build Xash3D Test
+name: Build Xash3D PS4 PKG
 
 on:
   push:
@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: zecoxao/openps4sdk:latest
 
     steps:
     - name: Checkout repository
@@ -16,25 +18,20 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake libsdl2-dev libgl1-mesa-dev libfontconfig1-dev
-
-    - name: Fix rsqrt conflict in source code
-      run: |
-        find . -type f \( -name "*.c" -o -name "*.h" -o -name "*.cpp" -o -name "*.cc" \) -exec sed -i 's/\brsqrt\b/xash_rsqrt/g' {} +
-
-    - name: Configure CMake
+    - name: Configure CMake for PS4
       run: |
         cmake -B build -S . \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-          -DXASH_64BIT=1 \
-          -DCMAKE_C_STANDARD=11 \
-          -DCMAKE_C_FLAGS="-w -D_GNU_SOURCE -Wno-error=incompatible-pointer-types -Wno-error=int-conversion" \
-          -DCMAKE_CXX_FLAGS="-w -D_GNU_SOURCE -Wno-error=incompatible-pointer-types -Wno-error=int-conversion"
+          -DCMAKE_TOOLCHAIN_FILE=$PS4SDK/share/openps4sdk.cmake
 
     - name: Compile Project
-      run: cmake --build build
-      
+      run: cmake --build build --parallel $(nproc)
+
+    - name: Upload PKG Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Xash3D-PS4
+        path: |
+          build/**/*.pkg
+          build/**/*.elf
+          
