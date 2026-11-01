@@ -23,9 +23,10 @@ jobs:
         
         git clone --recursive https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain.git $HOME/openps4sdk
         
-        echo "OO_PS4_TOOLCHAIN=$HOME/openps4sdk" >> $GITHUB_ENV
-        echo "$HOME/openps4sdk/bin" >> $GITHUB_PATH
-        echo "$HOME/openps4sdk/bin/linux" >> $GITHUB_PATH
+        # Собираем тулчейн, чтобы все утилиты встали на места
+        cd $HOME/openps4sdk
+        make || true
+        cd -
 
     - name: Fix rsqrt conflict in source code
       run: |
@@ -50,34 +51,45 @@ jobs:
       run: |
         mkdir -p pkg_root/sce_sys
         
-        # Создаем param.sfo
+        # Создаем правильный param.sfo для плойки
         python3 -c "
         with open('pkg_root/sce_sys/param.sfo', 'wb') as f:
             f.write(b'\x00PSF\x01\x01\x00\x00\x00\x01\x00\x00\x00\x00\x01\x00\x00\x01\x00\x00\x4c\x00\x00\x00\xf8\x00\x00\x00\x38\x00\x00\x00title_id\x00\x00\x00\x02\x00\x00\x00\x0c\x00\x0c\x00\x00\x00\x00\x00XASH00001\x00\x00')
         "
         
-        # Достаем бинарник
+        # Находим и копируем скомпилированный бинарник как eboot.bin
         find build -name "*.elf" -o -name "*.velf" -o -type f -executable | head -n 1 | xargs -I {} cp {} pkg_root/eboot.bin
         if [ ! -f "pkg_root/eboot.bin" ]; then
           find build -type f -size +100k | head -n 1 | xargs -I {} cp {} pkg_root/eboot.bin
         fi
         
-        # Компилируем утилиту create-package из исходников OpenOrbis, если она нужна
-        if [ -d "$HOME/openps4sdk/tools/create-package" ]; then
-          cd $HOME/openps4sdk/tools/create-package && make || true
-          cd -
-        fi
-        
         mkdir -p final_pkg
         
-        # Пробуем запустить упаковщик
-        if [ -f "$HOME/openps4sdk/tools/create-package/create-package" ]; then
-          $HOME/openps4sdk/tools/create-package/create-package pkg_root final_pkg/XashOrbis.pkg
+        # Ищем утилиту create-package везде, где она может быть
+        CP_TOOL=""
+        if [ -f "$HOME/openps4sdk/bin/create-package" ]; then
+          CP_TOOL="$HOME/openps4sdk/bin/create-package"
         elif [ -f "$HOME/openps4sdk/bin/linux/create-package" ]; then
-          $HOME/openps4sdk/bin/linux/create-package pkg_root final_pkg/XashOrbis.pkg
+          CP_TOOL="$HOME/openps4sdk/bin/linux/create-package"
+        elif [ -f "$HOME/openps4sdk/tools/create-package/create-package" ]; then
+          CP_TOOL="$HOME/openps4sdk/tools/create-package/create-package"
+        elif command -v create-package &> /dev/null; then
+          CP_TOOL="create-package"
+        fi
+        
+        # Если нашли утилиту — упаковываем в .pkg, если нет — пробуем собрать её из исходников в репозитории SDK
+        if [ -n "$CP_TOOL" ]; then
+          echo "Using create-package: $CP_TOOL"
+          $CP_TOOL pkg_root final_pkg/XashOrbis.pkg
         else
-          # Запасной вариант: если утилита не собралась, сделаем zip-архив структуры
-          zip -r final_pkg/XashOrbis_Files.zip pkg_root/*
+          echo "Compiling create-package from SDK source..."
+          if [ -d "$HOME/openps4sdk/tools/create-package" ]; then
+            cd "$HOME/openps4sdk/tools/create-package" && make || true
+            cd -
+            if [ -f "$HOME/openps4sdk/tools/create-package/create-package" ]; then
+              "$HOME/openps4sdk/tools/create-package/create-package" pkg_root final_pkg/XashOrbis.pkg
+            fi
+          fi
         fi
         
         ls -la final_pkg
