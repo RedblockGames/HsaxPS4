@@ -1,4 +1,4 @@
-name: Build Xash3D PS4 PKG
+name: Build XashOrbis PS4
 
 on:
   push:
@@ -46,25 +46,9 @@ jobs:
     - name: Compile Project
       run: cmake --build build --parallel $(nproc)
 
-    - name: Create Package Structure
-      run: |
-        mkdir -p pkg_root/sce_sys
-        # Создаем минимальный param.sfo и структуру для запуска на PS4
-        cd build
-        # Копируем скомпилированный бинарник в папку пакета
-        find . -name "*.elf" -exec cp {} ../pkg_root/eboot.bin \;
-
-    - name: Package to PKG
-      run: |
-        # Используем утилиту упаковки OpenOrbis, если она доступна, либо сохраняем ELF
-        ls -la pkg_root
-
     - name: Upload PKG Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Xash3D-PS4
-        path: |
-          pkg_root/**/*
-          build/**/*.elf
-          build/**/*.a
-          
+        name: XashOrbis-PS4
+        path: build/
+        
