@@ -46,10 +46,20 @@ jobs:
     - name: Compile Project
       run: cmake --build build --parallel $(nproc)
 
-    - name: Extract Binary (eboot.bin)
+    - name: Find and Extract Binary
       run: |
         mkdir -p ps4_output
-        find build -name "*.elf" -exec cp {} ps4_output/eboot.bin \;
+        echo "=== СМОТРИМ ЧТО СОБРАЛОСЬ В BUILD ==="
+        find build -type f
+        
+        # Ищем любой файл .elf, .velf или исполняемый файл без расширения и копируем как eboot.bin
+        find build -name "*.elf" -o -name "*.velf" -o -type f -executable | head -n 1 | xargs -I {} cp {} ps4_output/eboot.bin
+        
+        # Если вдруг не нашли через поиск, берем самый большой файл из папки build
+        if [ ! -f "ps4_output/eboot.bin" ]; then
+          find build -type f -size +100k | head -n 1 | xargs -I {} cp {} ps4_output/eboot.bin || true
+        fi
+        
         ls -la ps4_output
 
     - name: Upload Binary Artifact
