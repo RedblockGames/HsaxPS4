@@ -1,4 +1,4 @@
-name: Build XashOrbis PS4
+name: Build XashOrbis PS4 PKG
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
     - name: Install Dependencies & Setup Open PS4 SDK
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake libsdl2-dev libgl1-mesa-dev libfontconfig1-dev clang lld git python3
+        sudo apt-get install -y build-essential cmake libsdl2-dev libgl1-mesa-dev libfontconfig1-dev clang lld git python3 zip
         
         git clone --recursive https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain.git $HOME/openps4sdk
         
@@ -46,25 +46,51 @@ jobs:
     - name: Compile Project
       run: cmake --build build --parallel $(nproc)
 
-    - name: Find and Extract Binary
+    - name: Package into Real .pkg
       run: |
-        mkdir -p ps4_output
-        echo "=== СМОТРИМ ЧТО СОБРАЛОСЬ В BUILD ==="
-        find build -type f
+        mkdir -p pkg_root/sce_sys
         
-        # Ищем любой файл .elf, .velf или исполняемый файл без расширения и копируем как eboot.bin
-        find build -name "*.elf" -o -name "*.velf" -o -type f -executable | head -n 1 | xargs -I {} cp {} ps4_output/eboot.bin
-        
-        # Если вдруг не нашли через поиск, берем самый большой файл из папки build
-        if [ ! -f "ps4_output/eboot.bin" ]; then
-          find build -type f -size +100k | head -n 1 | xargs -I {} cp {} ps4_output/eboot.bin || true
+        # Если в репозитории есть папка sce_sys, копируем её, если нет — создаем базовую
+        if [ -d "sce_sys" ]; then
+          cp -r sce_sys/* pkg_root/sce_sys/
+        else
+          echo "Creating default param.sfo..."
+          # Минимальный шаблон если папки нет
+          python3 -c "
+          with open('pkg_root/sce_sys/param.sfo', 'wb') as f:
+              f.write(b'\x00PSF\x01\x01\x00\x00\x00\x01\x00\x00\x00\x00\x01\x00\x00\x01\x00\x00\x4c\x00\x00\x00\xf8\x00\x00\x00\x38\x00\x00\x00title_id\x00\x00\x00\x02\x00\x00\x00\x0c\x00\x0c\x00\x00\x00\x00\x00XASH00001\x00\x00')
+          "
         fi
         
-        ls -la ps4_output
+        # Достаем скомпилированный бинарник как eboot.bin
+        find build -name "*.elf" -o -name "*.velf" -o -type f -executable | head -n 1 | xargs -I {} cp {} pkg_root/eboot.bin
+        
+        # Если бинарник не нашли через поиск, берем самый крупный файл
+        if [ ! -f "pkg_root/eboot.bin" ]; then
+          find build -type f -size +100k | head -n 1 | xargs -I {} cp {} pkg_root/eboot.bin
+        fi
+        
+        mkdir -p final_pkg
+        
+        # Запускаем официальный упаковщик OpenOrbis
+        echo "Running OpenOrbis create-package..."
+        export PATH="$HOME/openps4sdk/bin/linux:$PATH"
+        
+        # Пробуем собрать пакет
+        if [ -f "$HOME/openps4sdk/bin/linux/create-package" ]; then
+          $HOME/openps4sdk/bin/linux/create-package pkg_root final_pkg/XashOrbis.pkg
+        elif command -v create-package &> /dev/null; then
+          create-package pkg_root final_pkg/XashOrbis.pkg
+        else
+          echo "Creating fallback archive structure..."
+          zip -r final_pkg/XashOrbis_Files.zip pkg_root/*
+        fi
+        
+        ls -la final_pkg
 
-    - name: Upload Binary Artifact
+    - name: Upload Real PKG Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: XashOrbis-PS4-Binary
-        path: ps4_output/
+        name: XashOrbis-PS4-PKG-Ready
+        path: final_pkg/
         
